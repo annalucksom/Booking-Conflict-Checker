@@ -3,18 +3,15 @@
 #include <vector>
 using namespace std;
 
-// Interval represents a booking time slot
 struct Interval {
     int start, end;
     Interval(int s, int e) : start(s), end(e) {}
 };
 
-// Helper function to detect overlap between two intervals
 bool doOverlap(Interval i1, Interval i2) {
     return (i1.start < i2.end && i2.start < i1.end);
 }
 
-// Node of the interval tree
 class IntervalTreeNode {
 public:
     Interval interval;
@@ -25,7 +22,6 @@ public:
         : interval(i), maxEnd(i.end), left(nullptr), right(nullptr) {}
 };
 
-// Interval Tree for efficient conflict detection
 class IntervalTree {
 private:
     IntervalTreeNode* root;
@@ -87,7 +83,6 @@ public:
     }
 };
 
-// Main driver function
 int main() {
     IntervalTree bookingSystem;
     int choice;
