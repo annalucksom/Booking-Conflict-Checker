@@ -1,6 +1,6 @@
-Booking Conflict Checker using Interval Tree (C++)
+Booking Conflict Checker using Interval Tree 
 
-This project is a console-based application that helps manage booking slots and detect scheduling conflicts efficiently using an **Interval Tree** data structure.
+This project is a console-based application that helps manage booking slots and detect scheduling conflicts efficiently using an Interval Tree data structure.
 
  Features
 - Add bookings with start and end times
