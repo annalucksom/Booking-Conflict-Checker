@@ -1,8 +1,3 @@
-
-// booking_conflict_gui.cpp
-// Placeholder for Qt GUI implementation of Booking Conflict Checker
-// Requires Qt framework (QtWidgets)
-
 #include <QApplication>
 #include <QWidget>
 #include <QPushButton>
@@ -34,7 +29,6 @@ int main(int argc, char *argv[]) {
     layout->addWidget(bookingList);
     window.setLayout(layout);
 
-    // Signal connections and Interval Tree logic to be added
 
     window.show();
     return app.exec();
