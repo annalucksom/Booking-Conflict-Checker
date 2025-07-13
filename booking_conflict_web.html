@@ -1,0 +1,48 @@
+
+<!-- booking_conflict_web.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Booking Conflict Checker</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Booking Conflict Checker</h2>
+    <input type="number" id="start" placeholder="Start Time">
+    <input type="number" id="end" placeholder="End Time">
+    <button onclick="addBooking()">Add Booking</button>
+    <p id="result"></p>
+    <h3>Bookings:</h3>
+    <ul id="bookings"></ul>
+
+    <script>
+        const bookings = [];
+
+        function doOverlap(a, b) {
+            return a.start < b.end && b.start < a.end;
+        }
+
+        function addBooking() {
+            const start = parseInt(document.getElementById('start').value);
+            const end = parseInt(document.getElementById('end').value);
+            const newBooking = {start, end};
+
+            for (let b of bookings) {
+                if (doOverlap(b, newBooking)) {
+                    document.getElementById('result').innerText = "❌ Conflict Detected!";
+                    return;
+                }
+            }
+
+            bookings.push(newBooking);
+            document.getElementById('result').innerText = "✅ Booking Added!";
+            const li = document.createElement('li');
+            li.innerText = `[${start}, ${end}]`;
+            document.getElementById('bookings').appendChild(li);
+        }
+    </script>
+</body>
+</html>
