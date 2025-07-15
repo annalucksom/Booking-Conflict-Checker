@@ -1,45 +1,448 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Booking Conflict Checker</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Conflict Checker with Interval Tree</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: Arial; margin: 20px; }
-        input, button { margin: 5px; }
+        .interval-visualization {
+            display: inline-block;
+            height: 30px;
+            background-color: #3B82F6;
+            border-radius: 4px;
+            position: relative;
+            margin: 5px 0;
+            transition: all 0.3s ease;
+        }
+        .interval-visualization.conflict {
+            background-color: #EF4444;
+        }
+        .time-marker {
+            position: absolute;
+            top: -20px;
+            font-size: 10px;
+            color: #6B7280;
+        }
+        .tree-node {
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px;
+            background-color: #F9FAFB;
+        }
+        .tree-node.highlight {
+            background-color: #EFF6FF;
+            border-color: #3B82F6;
+        }
+        .conflict-message {
+            color: #EF4444;
+            font-weight: bold;
+        }
+        .no-conflict-message {
+            color: #10B981;
+            font-weight: bold;
+        }
+        #timeScale {
+            height: 20px;
+            background: linear-gradient(to right, #F3F4F6, #D1D5DB);
+            position: relative;
+            margin-bottom: 30px;
+        }
+        .tree-connection {
+            position: relative;
+        }
+        .tree-connection::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            width: 2px;
+            height: 10px;
+            background-color: #D1D5DB;
+        }
     </style>
 </head>
-<body>
-    <h2>Booking Conflict Checker</h2>
-    <input type="number" id="start" placeholder="Start Time">
-    <input type="number" id="end" placeholder="End Time">
-    <button onclick="addBooking()">Add Booking</button>
-    <p id="result"></p>
-    <h3>Bookings:</h3>
-    <ul id="bookings"></ul>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+            Booking Conflict Checker with Interval Tree
+        </h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Add New Booking</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input type="number" id="startTime" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="0" max="100" value="1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="number" id="endTime" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="1" max="100" value="5">
+                </div>
+                <div class="flex items-end">
+                    <button id="addBooking" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition">
+                        Add Booking
+                    </button>
+                </div>
+            </div>
+            <div id="timeScaleContainer">
+                <div id="timeScale"></div>
+                <div id="intervalsDisplay" class="mb-6"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Check for Conflicts</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <input type="number" id="checkStart" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="0" max="100" value="4">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <input type="number" id="checkEnd" class="w-full px-3 py-2 border border-gray-300 rounded-md" min="1" max="100" value="6">
+                    </div>
+                    <div class="flex items-end">
+                        <button id="checkConflict" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition">
+                            Check
+                        </button>
+                    </div>
+                </div>
+                <div id="conflictResult" class="mt-4"></div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Interval Tree Visualization</h2>
+                <div id="treeVisualization"></div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">All Bookings</h2>
+            <div id="bookingsList" class="space-y-2"></div>
+        </div>
+    </div>
 
     <script>
-        const bookings = [];
-
-        function doOverlap(a, b) {
-            return a.start < b.end && b.start < a.end;
+        
+        class Interval {
+            constructor(start, end) {
+                this.start = start;
+                this.end = end;
+            }
         }
 
-        function addBooking() {
-            const start = parseInt(document.getElementById('start').value);
-            const end = parseInt(document.getElementById('end').value);
-            const newBooking = {start, end};
+        class IntervalNode {
+            constructor(interval) {
+                this.interval = interval;
+                this.maxEnd = interval.end;
+                this.left = null;
+                this.right = null;
+            }
+        }
 
-            for (let b of bookings) {
-                if (doOverlap(b, newBooking)) {
-                    document.getElementById('result').innerText = "❌ Conflict Detected!";
-                    return;
-                }
+        class IntervalTree {
+            constructor() {
+                this.root = null;
             }
 
-            bookings.push(newBooking);
-            document.getElementById('result').innerText = "✅ Booking Added!";
-            const li = document.createElement('li');
-            li.innerText = `[${start}, ${end}]`;
-            document.getElementById('bookings').appendChild(li);
+            insert(interval) {
+                this.root = this._insert(this.root, interval);
+            }
+
+            _insert(node, interval) {
+                if (node === null) {
+                    return new IntervalNode(interval);
+                }
+
+                if (interval.start < node.interval.start) {
+                    node.left = this._insert(node.left, interval);
+                } else {
+                    node.right = this._insert(node.right, interval);
+                }
+
+                node.maxEnd = Math.max(node.maxEnd, interval.end);
+                return node;
+            }
+
+            checkConflict(interval) {
+                return this._checkConflict(this.root, interval, null);
+            }
+
+            _checkConflict(node, interval, conflictNode) {
+                if (node === null) {
+                    return { conflict: false, withNode: null };
+                }
+
+                
+                document.querySelectorAll('.tree-node').forEach(el => el.classList.remove('highlight'));
+
+                
+                setTimeout(() => {
+                    document.querySelectorAll('.tree-node').forEach(el => {
+                        if (parseInt(el.dataset.start) === node.interval.start && 
+                            parseInt(el.dataset.end) === node.interval.end) {
+                            el.classList.add('highlight');
+                        }
+                    });
+                }, 100);
+
+                if (this._doOverlap(node.interval, interval)) {
+                    return { conflict: true, withNode: node };
+                }
+
+                if (node.left !== null && node.left.maxEnd >= interval.start) {
+                    return this._checkConflict(node.left, interval, node);
+                }
+
+                return this._checkConflict(node.right, interval, node);
+            }
+
+            _doOverlap(i1, i2) {
+                return (i1.start < i2.end && i2.start < i1.end);
+            }
+
+            getAllIntervals() {
+                const intervals = [];
+                this._inOrderTraversal(this.root, intervals);
+                return intervals;
+            }
+
+            _inOrderTraversal(node, result) {
+                if (node !== null) {
+                    this._inOrderTraversal(node.left, result);
+                    result.push(node.interval);
+                    this._inOrderTraversal(node.right, result);
+                }
+            }
+        }
+
+        
+        const addBookingBtn = document.getElementById('addBooking');
+        const checkConflictBtn = document.getElementById('checkConflict');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        const checkStartInput = document.getElementById('checkStart');
+        const checkEndInput = document.getElementById('checkEnd');
+        const intervalsDisplay = document.getElementById('intervalsDisplay');
+        const bookingsList = document.getElementById('bookingsList');
+        const conflictResult = document.getElementById('conflictResult');
+        const treeVisualization = document.getElementById('treeVisualization');
+        const timeScale = document.getElementById('timeScale');
+
+        
+        const tree = new IntervalTree();
+
+        
+        tree.insert(new Interval(1, 5));
+        tree.insert(new Interval(10, 15));
+        tree.insert(new Interval(20, 25));
+        tree.insert(new Interval(30, 35));
+
+        
+        updateUI();
+
+        
+        addBookingBtn.addEventListener('click', () => {
+            const start = parseInt(startTimeInput.value);
+            const end = parseInt(endTimeInput.value);
+
+            if (start >= end) {
+                alert("End time must be greater than start time");
+                return;
+            }
+
+            const interval = new Interval(start, end);
+            const conflict = tree.checkConflict(interval);
+            if (conflict.conflict) {
+                alert(`Conflict detected with existing booking (${conflict.withNode.interval.start}-${conflict.withNode.interval.end})`);
+                return;
+            }
+
+            tree.insert(interval);
+            updateUI();
+            startTimeInput.value = "";
+            endTimeInput.value = "";
+        });
+
+        checkConflictBtn.addEventListener('click', () => {
+            const start = parseInt(checkStartInput.value);
+            const end = parseInt(checkEndInput.value);
+
+            if (start >= end) {
+                alert("End time must be greater than start time");
+                return;
+            }
+
+            const interval = new Interval(start, end);
+            const conflict = tree.checkConflict(interval);
+
+            if (conflict.conflict) {
+                conflictResult.innerHTML = `<p class="conflict-message">Conflict detected with booking (${conflict.withNode.interval.start}-${conflict.withNode.interval.end})</p>`;
+                
+                
+                setTimeout(() => {
+                    document.querySelectorAll('.tree-node').forEach(el => {
+                        if (parseInt(el.dataset.start) === conflict.withNode.interval.start && 
+                            parseInt(el.dataset.end) === conflict.withNode.interval.end) {
+                            el.classList.add('highlight');
+                        }
+                    });
+                }, 100);
+            } else {
+                conflictResult.innerHTML = `<p class="no-conflict-message">No conflict detected</p>`;
+            }
+
+            setTimeout(() => {
+                document.querySelectorAll('.tree-node').forEach(el => el.classList.remove('highlight'));
+            }, 2000);
+        });
+
+        
+        function updateUI() {
+            updateTimeScale();
+            updateIntervalsDisplay();
+            updateBookingsList();
+            updateTreeVisualization();
+        }
+
+        function updateTimeScale() {
+            timeScale.innerHTML = '';
+            const intervals = tree.getAllIntervals();
+            let maxTime = 0;
+            
+            if (intervals.length > 0) {
+                maxTime = Math.max(...intervals.map(i => i.end));
+            }
+            maxTime = Math.max(maxTime, 30); 
+            
+            
+            for (let i = 0; i <= maxTime; i += 5) {
+                const marker = document.createElement('div');
+                marker.className = 'time-marker';
+                marker.style.left = `${(i / maxTime) * 100}%`;
+                marker.textContent = i;
+                timeScale.appendChild(marker);
+            }
+        }
+
+        function updateIntervalsDisplay() {
+            intervalsDisplay.innerHTML = '';
+            const intervals = tree.getAllIntervals();
+            
+            if (intervals.length === 0) {
+                intervalsDisplay.innerHTML = '<p class="text-gray-500">No bookings added yet</p>';
+                return;
+            }
+
+            const maxTime = Math.max(...intervals.map(i => i.end), 30);
+            
+            intervals.forEach(interval => {
+                const visual = document.createElement('div');
+                visual.className = 'interval-visualization';
+                visual.style.width = `${((interval.end - interval.start) / maxTime) * 100}%`;
+                visual.style.left = `${(interval.start / maxTime) * 100}%`;
+                visual.innerHTML = `
+                    <div class="text-white text-xs absolute left-1 top-1">${interval.start}-${interval.end}</div>
+                `;
+                intervalsDisplay.appendChild(visual);
+            });
+        }
+
+        function updateBookingsList() {
+            bookingsList.innerHTML = '';
+            const intervals = tree.getAllIntervals();
+            
+            if (intervals.length === 0) {
+                bookingsList.innerHTML = '<p class="text-gray-500">No bookings added yet</p>';
+                return;
+            }
+
+            intervals.forEach(interval => {
+                const bookingItem = document.createElement('div');
+                bookingItem.className = 'flex justify-between items-center py-2 px-3 bg-gray-50 rounded';
+                bookingItem.innerHTML = `
+                    <span class="font-medium">${interval.start} - ${interval.end}</span>
+                    <button class="text-red-500 hover:text-red-700 remove-booking" data-start="${interval.start}" data-end="${interval.end}">
+                        Remove
+                    </button>
+                `;
+                bookingsList.appendChild(bookingItem);
+            });
+
+            document.querySelectorAll('.remove-booking').forEach(button => {
+                button.addEventListener('click', function() {
+                    const start = parseInt(this.dataset.start);
+                    const end = parseInt(this.dataset.end);
+                    removeBooking(start, end);
+                });
+            });
+        }
+
+        function removeBooking(start, end) {
+            
+            const intervals = tree.getAllIntervals().filter(i => !(i.start === start && i.end === end));
+        
+            tree.root = null;
+            
+            intervals.forEach(interval => tree.insert(interval));
+            
+            updateUI();
+        }
+
+        function updateTreeVisualization() {
+            treeVisualization.innerHTML = '';
+            const intervals = tree.getAllIntervals();
+            
+            if (intervals.length === 0) {
+                treeVisualization.innerHTML = '<p class="text-gray-500">Tree is empty</p>';
+                return;
+            }
+
+            renderTree(tree.root, treeVisualization, true);
+        }
+
+        function renderTree(node, parentElement, isRoot = false) {
+            if (node === null) return;
+
+            const container = document.createElement('div');
+            if (!isRoot) {
+                container.className = 'tree-connection';
+            }
+            
+            const nodeElement = document.createElement('div');
+            nodeElement.className = 'tree-node';
+            nodeElement.dataset.start = node.interval.start;
+            nodeElement.dataset.end = node.interval.end;
+            nodeElement.innerHTML = `
+                <div class="text-center font-medium">${node.interval.start}-${node.interval.end}</div>
+                <div class="text-xs text-gray-500 text-center">max: ${node.maxEnd}</div>
+            `;
+            
+            container.appendChild(nodeElement);
+            
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'flex justify-center space-x-8';
+            
+            if (node.left || node.right) {
+                const leftContainer = document.createElement('div');
+                if (node.left) {
+                    renderTree(node.left, leftContainer);
+                }
+                childrenContainer.appendChild(leftContainer);
+                
+                const rightContainer = document.createElement('div');
+                if (node.right) {
+                    renderTree(node.right, rightContainer);
+                }
+                childrenContainer.appendChild(rightContainer);
+                
+                container.appendChild(childrenContainer);
+            }
+            
+            parentElement.appendChild(container);
         }
     </script>
 </body>
